@@ -19,7 +19,7 @@ export const handleCheckoutCompleted = async (
     },
     data: {
       transactionId: session.id,
-      status: PaymentStatus.SUCCESS,
+      status: PaymentStatus.COMPLETED,
       paidAt: new Date(),
     },
   });
