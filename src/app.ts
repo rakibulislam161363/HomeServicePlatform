@@ -1,5 +1,5 @@
-import express, { Application }  from "express"
-import cors from "cors"
+import express, { Application } from "express";
+import cors from "cors";
 import config from "./config";
 import cookieParser from "cookie-parser";
 import { userRoute } from "./modules/user/user.route";
@@ -11,29 +11,25 @@ import { bookingRoute } from "./modules/booking/booking.route";
 import { paymentRouter } from "./modules/payment/payment.route";
 import { reviewRoute } from "./modules/review/review.route";
 import { notFound } from "./middleware/notFoundPage";
-
 const app: Application = express();
-
-
-app.use(cors({
+app.use(
+  cors({
     origin: config.appUrl,
-    credentials: true
-}));
+    credentials: true,
+  }),
+);
 app.use(express.json());
-app.use(express.urlencoded({extended: true}));
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.use("/api/users", userRoute)
-app.use("/api/auth", authRoute)
-app.use("/api/categories", categoriesRoute)
+app.use("/api/users", userRoute);
+app.use("/api/auth", authRoute);
+app.use("/api/categories", categoriesRoute);
 app.use("/api/services", routerService);
 app.use("/api/booking", bookingRoute);
 app.use("/api/payment", paymentRouter);
-app.use("/api/review", reviewRoute)
-
+app.use("/api/review", reviewRoute);
 app.use(notFound);
-
-app.use(globalErrorHandler)
-
+app.use(globalErrorHandler);
 
 export default app;
