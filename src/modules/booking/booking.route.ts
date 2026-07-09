@@ -29,7 +29,7 @@ router.get(
 // Technician
 router.patch(
   "/:id",
-  auth(Role.TECHNICIAN),
+  auth(Role.TECHNICIAN,Role.CUSTOMER),
   bookingController.updateBooking
 );
 
