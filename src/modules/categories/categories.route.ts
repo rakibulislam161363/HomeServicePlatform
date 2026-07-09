@@ -5,14 +5,14 @@ import { Role } from "../../../generated/prisma/enums";
 
 const router = Router();
 
-router.post("/", auth(Role.ADMIN), categoryController.createCategory)
+router.post("/", auth(Role.ADMIN,Role.TECHNICIAN), categoryController.createCategory)
 router.get("/", categoryController.getAllCategories);
 router.patch(
   "/:id",
   auth(Role.ADMIN),
   categoryController.updateCategory
 );
-// router.delete("/:id")
+router.delete("/:id", categoryController.deleteCatagory)
 
 
 export const categoriesRoute = router;
