@@ -33,7 +33,6 @@ const createService = async (
 
   return result;
 };
-
 const getAllServices = async (query: any) => {
   const {
     search,
