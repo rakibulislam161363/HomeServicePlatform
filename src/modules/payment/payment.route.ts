@@ -31,4 +31,4 @@ router.get(
   auth(Role.CUSTOMER),
   paymentController.getSinglePayment
 );
-export const paymentRouter = router
+export const paymentRouter = router;
