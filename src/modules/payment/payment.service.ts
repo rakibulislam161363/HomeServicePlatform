@@ -114,8 +114,53 @@ const confirmPayment = async (req: any) => {
     received: true,
   };
 };
+const getMyPayments = async (userId: string) => {
+  const result = await prisma.payment.findMany({
+    where: {
+      booking: {
+        customerId: userId,
+      },
+    },
+    include: {
+      booking: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  return result;
+};
+
+const getSinglePayment = async (
+  paymentId: string,
+  userId: string
+) => {
+  const payment = await prisma.payment.findUnique({
+    where: {
+      id: paymentId,
+    },
+    include: {
+      booking: true,
+    },
+  });
+
+  if (!payment) {
+    throw new Error("Payment not found");
+  }
+
+
+  if (payment.booking.customerId !== userId) {
+    throw new Error("Unauthorized");
+  }
+
+  return payment;
+};
 
 export const paymentService = {
   createPayment,
-  confirmPayment
+  confirmPayment,
+  getMyPayments,
+  getSinglePayment
 };
+

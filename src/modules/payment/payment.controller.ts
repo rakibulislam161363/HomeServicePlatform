@@ -25,7 +25,40 @@ const confirmPayment = catchAsync(async (req, res) => {
   res.status(200).json(result);
 });
 
+const getMyPayments = catchAsync(async (req, res) => {
+  const userId = req.user?.id;
+
+  const result = await paymentService.getMyPayments(userId as string);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Payments retrieved successfully",
+    data: result,
+  });
+});
+
+const getSinglePayment = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user?.id;
+
+  const result = await paymentService.getSinglePayment(
+    id as string,
+    userId as string
+  );
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Payment retrieved successfully",
+    data: result,
+  });
+});
+
+
 export const paymentController = {
   createPayment,
-  confirmPayment
+  confirmPayment,
+  getMyPayments,
+  getSinglePayment
 };
