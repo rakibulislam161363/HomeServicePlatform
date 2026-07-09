@@ -8,6 +8,7 @@ import { globalErrorHandler } from "./middleware/globalErrorHandaler";
 import { categoriesRoute } from "./modules/categories/categories.route";
 import { routerService } from "./modules/service/service.route";
 import { bookingRoute } from "./modules/booking/booking.route";
+import { paymentRouter } from "./modules/payment/payment.route";
 
 const app: Application = express();
 
@@ -24,7 +25,8 @@ app.use("/api/users", userRoute)
 app.use("/api/auth", authRoute)
 app.use("/api/categories", categoriesRoute)
 app.use("/api/services", routerService);
-app.use("/api/booking", bookingRoute)
+app.use("/api/booking", bookingRoute);
+app.use("/api/payment", paymentRouter)
 
 app.use(globalErrorHandler)
 

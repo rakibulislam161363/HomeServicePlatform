@@ -1,23 +1,34 @@
 import { Router } from "express";
 import { Role } from "../../../generated/prisma/enums";
 import { auth } from "../../middleware/auth";
-import { subscriptionController } from "./payment.controller";
+import { paymentController } from "./payment.controller";
+import express from "express"
 
 const router = Router()
 
 router.post(
-    "/checkout", 
-    auth(Role.CUSTOMER, Role.TECHNICIAN, Role.ADMIN),
-    subscriptionController.createCheckoutSession
-)
+  "/create",
+  auth(Role.CUSTOMER),
+  paymentController.createPayment
+);
 
-//cancel subscription
+;
 
-router.post("/webhook", subscriptionController.handleWebhook )
+router.post(
+  "/confirm",
+  express.raw({ type: "application/json" }),
+  paymentController.confirmPayment
+);
 
+router.get(
+  "/",
+  auth(Role.CUSTOMER),
+  paymentController.getMyPayments
+);
 
-router.get("/status", 
-    auth(Role.CUSTOMER, Role.TECHNICIAN, Role.ADMIN),
-    subscriptionController.getSubscriptionStatus)
-
-export const subscriptionRoutes = router
+router.get(
+  "/:id",
+  auth(Role.CUSTOMER),
+  paymentController.getSinglePayment
+);
+export const paymentRouter = router

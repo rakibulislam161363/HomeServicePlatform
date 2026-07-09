@@ -1,123 +1,121 @@
-import config from "../../config";
+import Stripe from "stripe";
+import { BookingStatus, PaymentProvider, PaymentStatus } from "../../../generated/prisma/enums";
 import { prisma } from "../../lib/prisma";
 import { stripe } from "../../lib/stripe";
-import { handleChangeSubscription, handleCheckoutCompleted } from "./payment.utils";
+import config from "../../config";
 
-const createCheckoutSession = async (userId : string) => {
-    const transactionResult = await prisma.$transaction(async (tx) => {
+const createPayment = async (
+  userId: string,
+  payload: { bookingId: string }
+) => {
 
-        const user = await tx.user.findUniqueOrThrow({
-            where : {
-                id : userId
-            },
-            // include : {
-            //     subscription : true
-            // }
-        })
+  const booking = await prisma.booking.findUnique({
+    where: {
+      id: payload.bookingId,
+    },
+    include: {
+      customer: true,
+    },
+  });
 
-        //old subscriber
-        let stripeCustomerId = user.subscription?.stripeCustomerId;
+  if (!booking) {
+    throw new Error("Booking not found");
+  }
 
-        if(!stripeCustomerId){
-            // new subscriber
-            const customer = await stripe.customers.create({
-                email: user.email,
-                name: user.name,
-                metadata: { userId: user.id }
-            })
+  if (booking.customerId !== userId) {
+    throw new Error("Unauthorized");
+  }
 
-            stripeCustomerId = customer.id
-        }
-        console.log("Stripe Price ID:", config.stripe_product_price_id);
+  if (booking.status !== BookingStatus.ACCEPTED) {
+    throw new Error("Booking is not accepted yet");
+  }
 
-        const session = await stripe.checkout.sessions.create({
-            line_items : [
-                {
-                    price: config.stripe_product_price_id,
-                    quantity : 1
-                }
-            ],
-            mode : "subscription",
-            customer : stripeCustomerId,
-            payment_method_types : ["card"],
-            success_url : `${config.appUrl}/premium?success=true`,
-            cancel_url: `${config.appUrl}/payment?success=false`,
-            metadata : {userId : user.id}
-        })
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ["card"],
 
-        return session.url
+    line_items: [
+      {
+        price_data: {
+          currency: "bdt",
+          product_data: {
+            name: "Home Service Booking",
+          },
+          unit_amount: booking.totalPrice * 100,
+        },
+        quantity: 1,
+      },
+    ],
+
+    mode: "payment",
+
+    success_url: `${config.appUrl}/payment-success`,
+    cancel_url: `${config.appUrl}/payment-cancel`,
+
+    metadata: {
+      bookingId: booking.id,
+    },
+  });
+
+  await prisma.payment.create({
+    data: {
+      bookingId: booking.id,
+      amount: booking.totalPrice,
+      transactionId: session.id,
+      provider: PaymentProvider.STRIPE,
+      status: PaymentStatus.PENDING,
+    },
+  });
+
+  return {
+    checkoutUrl: session.url,
+  };
+};
+
+const confirmPayment = async (req: any) => {
+  const signature = req.headers["stripe-signature"] as string;
+
+  const event = stripe.webhooks.constructEvent(
+    req.body,
+    signature,
+    config.stripe_webhook_secret
+  );
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object as Stripe.Checkout.Session;
+
+    const bookingId = session.metadata?.bookingId;
+
+    if (!bookingId) {
+      throw new Error("Booking ID not found");
+    }
+
+    await prisma.payment.update({
+      where: {
+        bookingId,
+      },
+      data: {
+        status: PaymentStatus.COMPLETED,
+        transactionId: session.payment_intent as string,
+        paidAt: new Date(),
+      },
     });
 
-    return {
-        paymentUrl : transactionResult
-    }
-}
-
-
-const handleWebhook = async (payload : Buffer, signature : string) => {
-    const endpointSecret = config.stripe_webhook_secret
-    const event = stripe.webhooks.constructEvent(
-        payload,
-        signature,
-        endpointSecret
-    );
-
-
-    // Handle the event
-    switch (event.type) {
-        case 'checkout.session.completed':
-        //Occurs when a Checkout Session has been successfully completed.
-        // event.data.object
-            await handleCheckoutCompleted(event.data.object)
-           
-            break;
-        case 'customer.subscription.updated':
-        //Occurs whenever a subscription changes (e.g., switching from one plan to another, or changing the status from trial to active).
-            await handleChangeSubscription(event.data.object)
-            break;
-
-            /*
-            To test this run this command in terminal 
-            stripe subscriptions cancel sub_1PsYourSubIdHere (paste existinmg subscribed sub id)
-            */
-
-        case 'customer.subscription.deleted':
-        //Occurs whenever a customer’s subscription ends
-            await handleChangeSubscription(event.data.object)
-            break;
-
-        /*
-       To test this run this command in terminal 
-       stripe subscriptions cancel sub_1PsYourSubIdHere (paste existinmg subscribed sub id)
-       */
-
-        default:
-            // Unexpected event type
-            console.log(`No events matched. Unhandled event type ${event.type}.`);
-            break;
-    }
-}
-
-const getSubscriptionStatus = async (userId : string) => {
-    const isSubscriptionExist = await prisma.payment.findUniqueOrThrow({
-        where : {
-            userId
-        }
+    await prisma.booking.update({
+      where: {
+        id: bookingId,
+      },
+      data: {
+        status: BookingStatus.PAID,
+      },
     });
+  }
 
-    const isActive = isSubscriptionExist.status === "ACTIVE" && isSubscriptionExist.currentPeriodEnd && new Date(isSubscriptionExist.currentPeriodEnd) > new Date();
+  return {
+    received: true,
+  };
+};
 
-    return {
-        status : isSubscriptionExist.status,
-        isSubscribed : isActive,
-        currentPeriodEnd : isSubscriptionExist.currentPeriodEnd
-    }
-}
-
-
-
-export const subscriptionServices = {
-    createCheckoutSession,
-    handleWebhook,
-    getSubscriptionStatus
-}
+export const paymentService = {
+  createPayment,
+  confirmPayment
+};
