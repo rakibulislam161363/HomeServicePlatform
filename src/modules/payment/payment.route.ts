@@ -13,19 +13,16 @@ router.post(
 );
 
 ;
-
 router.post(
   "/confirm",
   express.raw({ type: "application/json" }),
   paymentController.confirmPayment
 );
-
 router.get(
   "/",
   auth(Role.CUSTOMER),
   paymentController.getMyPayments
 );
-
 router.get(
   "/:id",
   auth(Role.CUSTOMER),
