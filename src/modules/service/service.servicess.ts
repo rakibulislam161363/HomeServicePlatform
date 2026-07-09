@@ -47,7 +47,6 @@ const getAllServices = async (query: any) => {
   } = query;
 
   const where: any = {};
-
   // Search
   if (search) {
     where.title = {
