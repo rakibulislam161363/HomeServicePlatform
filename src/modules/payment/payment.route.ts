@@ -1,13 +1,13 @@
 import { Router } from "express";
 import { Role } from "../../../generated/prisma/enums";
 import { auth } from "../../middleware/auth";
-import { subscriptionController } from "./subscription.controller";
+import { subscriptionController } from "./payment.controller";
 
 const router = Router()
 
 router.post(
     "/checkout", 
-    auth(Role.USER, Role.AUTHOR, Role.ADMIN),
+    auth(Role.CUSTOMER, Role.TECHNICIAN, Role.ADMIN),
     subscriptionController.createCheckoutSession
 )
 
@@ -17,7 +17,7 @@ router.post("/webhook", subscriptionController.handleWebhook )
 
 
 router.get("/status", 
-    auth(Role.USER, Role.AUTHOR, Role.ADMIN),
+    auth(Role.CUSTOMER, Role.TECHNICIAN, Role.ADMIN),
     subscriptionController.getSubscriptionStatus)
 
 export const subscriptionRoutes = router

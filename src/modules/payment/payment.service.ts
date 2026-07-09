@@ -1,7 +1,7 @@
 import config from "../../config";
 import { prisma } from "../../lib/prisma";
 import { stripe } from "../../lib/stripe";
-import { handleChangeSubscription, handleCheckoutCompleted } from "./subscription.utils";
+import { handleChangeSubscription, handleCheckoutCompleted } from "./payment.utils";
 
 const createCheckoutSession = async (userId : string) => {
     const transactionResult = await prisma.$transaction(async (tx) => {
@@ -10,9 +10,9 @@ const createCheckoutSession = async (userId : string) => {
             where : {
                 id : userId
             },
-            include : {
-                subscription : true
-            }
+            // include : {
+            //     subscription : true
+            // }
         })
 
         //old subscriber
@@ -99,7 +99,7 @@ const handleWebhook = async (payload : Buffer, signature : string) => {
 }
 
 const getSubscriptionStatus = async (userId : string) => {
-    const isSubscriptionExist = await prisma.subscription.findUniqueOrThrow({
+    const isSubscriptionExist = await prisma.payment.findUniqueOrThrow({
         where : {
             userId
         }
