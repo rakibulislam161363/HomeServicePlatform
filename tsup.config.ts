@@ -4,7 +4,7 @@ export default defineConfig({
     entry: ['src/server.ts'],
     format:["esm"],
     target:"esnext",
-    outDir:"dist",
+    outDir:"dist/src",
     clean:true,
     bundle:true,
     splitting:false,
