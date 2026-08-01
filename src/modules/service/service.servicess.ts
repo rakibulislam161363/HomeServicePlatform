@@ -27,7 +27,11 @@ const createService = async (
     },
     include: {
       category: true,
-      technician: true,
+      technician:{
+        omit:{
+          password: true
+        }
+      },
     },
   });
 
@@ -114,6 +118,31 @@ const getAllServices = async (query: any) => {
   };
 };
 
+const getServiceById = async (serviceId: string) => {
+  const result = await prisma.service.findUnique({
+    where: {
+      id: serviceId,
+    },
+    include: {
+      category: true,
+      technician: {
+        omit: {
+          password: true,
+        },
+        include: {
+          technicianProfile: true,
+        },
+      },
+    },
+  });
+
+  if (!result) {
+    throw new Error("Service not found");
+  }
+
+  return result;
+};
+
 const updateService = async (
   serviceId: string,
   payload: Partial<IServicePayload>
@@ -141,6 +170,7 @@ const deleteService = async (serviceId: string) => {
 export const serviceService = {
     createService,
     getAllServices,
+    getServiceById,
     updateService,
     deleteService
 }

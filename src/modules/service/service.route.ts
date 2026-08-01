@@ -11,6 +11,9 @@ router.post(
   serviceController.createService
 );
 router.get("/", serviceController.getAllServices);
+
+router.get("/:id", serviceController.getServiceById);
+
 router.patch(
   "/:id",
   auth(Role.TECHNICIAN),

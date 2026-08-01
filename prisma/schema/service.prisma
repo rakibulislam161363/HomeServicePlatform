@@ -3,6 +3,7 @@ model Service {
   title         String
   description   String
   price         Float
+  location      String? 
   status        ServiceStatus @default(AVAILABLE)
 
   categoryId    String
