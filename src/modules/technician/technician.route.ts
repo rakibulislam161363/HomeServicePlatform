@@ -33,4 +33,5 @@ router.get(
   technicianController.getTechnicianById
 );
 
+
 export const technicianRoute = router;

@@ -26,6 +26,7 @@ router.get(
   bookingController.getSingleBooking
 );
 
+
 // Technician
 router.patch(
   "/:id",

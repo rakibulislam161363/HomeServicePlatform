@@ -1,7 +1,24 @@
-
 import { BookingStatus, Role } from "../../../generated/prisma/enums";
 import { prisma } from "../../lib/prisma";
 import { IBookingPayload } from "./booking.interface";
+
+const bookingInclude = {
+  customer: {
+    omit: {
+      password: true,
+    },
+  },
+  technician: {
+    omit: {
+      password: true,
+    },
+  },
+  service: {
+    include: {
+      category: true,
+    },
+  },
+};
 
 const createBooking = async (
   customerId: string,
@@ -17,77 +34,97 @@ const createBooking = async (
     throw new Error("Service not found");
   }
 
+  // Technician cannot book own service
+  if (service.technicianId === customerId) {
+    throw new Error("You cannot book your own service");
+  }
+
+  // Booking date validation
+  const bookingDate = new Date(payload.bookingDate);
+
+  if (bookingDate < new Date()) {
+    throw new Error("Booking date cannot be in the past");
+  }
+
+  // Prevent duplicate requested booking
+  const existingBooking = await prisma.booking.findFirst({
+    where: {
+      customerId,
+      serviceId: payload.serviceId,
+      status: BookingStatus.REQUESTED,
+    },
+  });
+
+  if (existingBooking) {
+    throw new Error("You already requested this service");
+  }
+
   const result = await prisma.booking.create({
     data: {
       customerId,
       technicianId: service.technicianId,
       serviceId: payload.serviceId,
-      bookingDate: new Date(payload.bookingDate),
+      bookingDate,
       address: payload.address,
       note: payload.note,
       totalPrice: service.price,
       status: BookingStatus.REQUESTED,
     },
-    include: {
-      customer: true,
-      technician: true,
-      service: true,
-    },
+    include: bookingInclude,
   });
 
   return result;
 };
 
-const getMyBookings = async (userId: string, role: string) => {
+const getMyBookings = async (
+  userId: string,
+  role: string
+) => {
   if (role === Role.CUSTOMER) {
-    return await prisma.booking.findMany({
+    return prisma.booking.findMany({
       where: {
         customerId: userId,
       },
-      include: {
-        customer: true,
-        technician: true,
-        service: true,
+      include: bookingInclude,
+      orderBy: {
+        createdAt: "desc",
       },
     });
   }
 
   if (role === Role.TECHNICIAN) {
-    return await prisma.booking.findMany({
+    return prisma.booking.findMany({
       where: {
         technicianId: userId,
       },
-      include: {
-        customer: true,
-        technician: true,
-        service: true,
+      include: bookingInclude,
+      orderBy: {
+        createdAt: "desc",
       },
     });
   }
 
-  return await prisma.booking.findMany({
-    include: {
-      customer: true,
-      technician: true,
-      service: true,
+  return prisma.booking.findMany({
+    include: bookingInclude,
+    orderBy: {
+      createdAt: "desc",
     },
   });
 };
 
-const getSingleBooking = async (bookingId: string) => {
-  const result = await prisma.booking.findUniqueOrThrow({
+const getSingleBooking = async (
+  bookingId: string
+) => {
+  return prisma.booking.findUniqueOrThrow({
     where: {
       id: bookingId,
     },
     include: {
-      customer: true,
-      technician: true,
-      service: true,
+      ...bookingInclude,
       payment: true,
+      review: true,
     },
   });
-
-  return result;
 };
 
 const updateBooking = async (
@@ -96,7 +133,22 @@ const updateBooking = async (
     status: BookingStatus;
   }
 ) => {
-  const result = await prisma.booking.update({
+  const booking =
+    await prisma.booking.findUniqueOrThrow({
+      where: {
+        id: bookingId,
+      },
+    });
+
+  if (
+    booking.status === BookingStatus.COMPLETED
+  ) {
+    throw new Error(
+      "Completed booking cannot be updated"
+    );
+  }
+
+  return prisma.booking.update({
     where: {
       id: bookingId,
     },
@@ -104,11 +156,26 @@ const updateBooking = async (
       status: payload.status,
     },
   });
-
-  return result;
 };
 
-const deleteBooking = async (bookingId: string) => {
+const deleteBooking = async (
+  bookingId: string
+) => {
+  const booking =
+    await prisma.booking.findUniqueOrThrow({
+      where: {
+        id: bookingId,
+      },
+    });
+
+  if (
+    booking.status === BookingStatus.COMPLETED
+  ) {
+    throw new Error(
+      "Completed booking cannot be deleted"
+    );
+  }
+
   await prisma.booking.delete({
     where: {
       id: bookingId,
