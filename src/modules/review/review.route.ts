@@ -5,6 +5,13 @@ import { Role } from "../../../generated/prisma/enums";
 
 const router = Router();
 
+
+router.get(
+  "/my-reviews",
+  auth(Role.TECHNICIAN),
+  reviewController.getMyReviews
+);
+
 router.post(
   "/",
   auth(Role.CUSTOMER),
@@ -14,6 +21,11 @@ router.post(
 router.get(
   "/",
   reviewController.getAllReviews
+);
+router.get(
+  "/booking/:bookingId",
+  auth(Role.CUSTOMER),
+  reviewController.getMyReviewByBooking
 );
 
 router.get(
@@ -29,7 +41,7 @@ router.patch(
 
 router.delete(
   "/:id",
-  auth(Role.CUSTOMER, Role.ADMIN),
+  auth(Role.CUSTOMER),
   reviewController.deleteReview
 );
 

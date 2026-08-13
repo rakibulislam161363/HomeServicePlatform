@@ -9,7 +9,7 @@ var __export = (target, all) => {
 };
 
 // src/app.ts
-import express2 from "express";
+import express from "express";
 import cors from "cors";
 
 // src/config/index.ts
@@ -299,10 +299,16 @@ var adapter = new PrismaPg({ connectionString });
 var prisma = new PrismaClient({ adapter });
 
 // src/modules/user/user.service.ts
-var getAllUsers = async () => {
+var getAllUsers = async (query) => {
   const users = await prisma.user.findMany({
+    where: {
+      ...query.role && { role: query.role }
+    },
     omit: {
       password: true
+    },
+    include: {
+      technicianProfile: true
     },
     orderBy: {
       createdAt: "desc"
@@ -311,15 +317,17 @@ var getAllUsers = async () => {
   return users;
 };
 var getSingleUser = async (userId) => {
-  const result = await prisma.user.findUniqueOrThrow({
+  return prisma.user.findUniqueOrThrow({
     where: {
       id: userId
     },
     omit: {
       password: true
+    },
+    include: {
+      technicianProfile: true
     }
   });
-  return result;
 };
 var getUserUpdate = async (payload, userId) => {
   const { name, phone, status, role } = payload;
@@ -354,19 +362,43 @@ var updateUserStatus = async (userId, status) => {
   return result;
 };
 var deleteUser = async (id) => {
-  const result = await prisma.user.delete({
+  return prisma.user.delete({
     where: {
       id
     }
   });
-  return result;
+};
+var getUserStats = async () => {
+  const totalUsers = await prisma.user.count();
+  const customers = await prisma.user.count({
+    where: {
+      role: "CUSTOMER"
+    }
+  });
+  const technicians = await prisma.user.count({
+    where: {
+      role: "TECHNICIAN"
+    }
+  });
+  const activeUsers = await prisma.user.count({
+    where: {
+      status: "ACTIVE"
+    }
+  });
+  return {
+    totalUsers,
+    customers,
+    technicians,
+    activeUsers
+  };
 };
 var userService = {
   getAllUsers,
   getSingleUser,
   getUserUpdate,
   updateUserStatus,
-  deleteUser
+  deleteUser,
+  getUserStats
 };
 
 // src/utils/sendResponse.ts
@@ -383,7 +415,7 @@ var sendResponse = (res, data) => {
 // src/modules/user/user.controller.ts
 import httpStatus from "http-status";
 var getAllUsers2 = catchAsync(async (req, res, next) => {
-  const result = await userService.getAllUsers();
+  const result = await userService.getAllUsers(req.query);
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
@@ -391,40 +423,50 @@ var getAllUsers2 = catchAsync(async (req, res, next) => {
     data: result
   });
 });
-var getSingleUser2 = catchAsync(async (req, res, next) => {
-  const userId = req.user?.id;
-  const result = await userService.getSingleUser(userId);
-  sendResponse(res, {
-    success: true,
-    statusCode: httpStatus.OK,
-    message: "Single users",
-    data: result
-  });
-});
-var updateUser = catchAsync(async (req, res, next) => {
-  const payload = req.body;
-  const userId = req.user?.id;
-  const result = await userService.getUserUpdate(payload, userId);
-  sendResponse(res, {
-    success: true,
-    statusCode: httpStatus.OK,
-    message: "User data update successfully",
-    data: result
-  });
-});
-var updateUserStatus2 = catchAsync(async (req, res, next) => {
-  const updateUserStatus3 = catchAsync(async (req2, res2) => {
-    const { id } = req2.params;
-    const { status } = req2.body;
-    const result = await userService.updateUserStatus(id, status);
-    sendResponse(res2, {
+var getSingleUser2 = catchAsync(
+  async (req, res) => {
+    const { id } = req.params;
+    const result = await userService.getSingleUser(id);
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "User retrieved successfully",
+      data: result
+    });
+  }
+);
+var updateUser = catchAsync(
+  async (req, res) => {
+    const { id } = req.params;
+    const payload = req.body;
+    const result = await userService.getUserUpdate(
+      payload,
+      id
+    );
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "User updated successfully",
+      data: result
+    });
+  }
+);
+var updateUserStatus2 = catchAsync(
+  async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    const result = await userService.updateUserStatus(
+      id,
+      status
+    );
+    sendResponse(res, {
       success: true,
       statusCode: httpStatus.OK,
       message: "User status updated successfully",
       data: result
     });
-  });
-});
+  }
+);
 var deleteUser2 = catchAsync(async (req, res, next) => {
   const { id } = req.params;
   const result = await userService.deleteUser(id);
@@ -435,11 +477,21 @@ var deleteUser2 = catchAsync(async (req, res, next) => {
     data: null
   });
 });
+var getUserStats2 = catchAsync(async (req, res) => {
+  const result = await userService.getUserStats();
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Stats fetched successfully",
+    data: result
+  });
+});
 var userController = {
   getAllUsers: getAllUsers2,
   getSingleUser: getSingleUser2,
   updateUser,
   updateUserStatus: updateUserStatus2,
+  getUserStats: getUserStats2,
   deleteUser: deleteUser2
 };
 
@@ -511,8 +563,9 @@ var auth = (...requiredRoles) => {
 
 // src/modules/user/user.route.ts
 var router = Router();
-router.get("/", auth(Role.ADMIN), userController.getAllUsers);
-router.get("/:id", auth(Role.ADMIN), userController.getSingleUser);
+router.get("/stats", auth(Role.ADMIN), userController.getUserStats);
+router.get("/", userController.getAllUsers);
+router.get("/:id", userController.getSingleUser);
 router.patch("/:id", auth(Role.ADMIN), userController.updateUser);
 router.patch("/:id/status", auth(Role.ADMIN), userController.updateUserStatus);
 router.delete("/:id", auth(Role.ADMIN), userController.deleteUser);
@@ -1096,6 +1149,26 @@ import { Router as Router5 } from "express";
 import httpStatus6 from "http-status";
 
 // src/modules/booking/booking.service.ts
+var bookingInclude = {
+  customer: {
+    omit: {
+      password: true
+    }
+  },
+  technician: {
+    omit: {
+      password: true
+    },
+    include: {
+      technicianProfile: true
+    }
+  },
+  service: {
+    include: {
+      category: true
+    }
+  }
+};
 var createBooking = async (customerId, payload) => {
   const service = await prisma.service.findUnique({
     where: {
@@ -1105,74 +1178,92 @@ var createBooking = async (customerId, payload) => {
   if (!service) {
     throw new Error("Service not found");
   }
+  if (service.technicianId === customerId) {
+    throw new Error("You cannot book your own service");
+  }
+  const bookingDate = new Date(payload.bookingDate);
+  if (bookingDate < /* @__PURE__ */ new Date()) {
+    throw new Error("Booking date cannot be in the past");
+  }
+  const existingBooking = await prisma.booking.findFirst({
+    where: {
+      customerId,
+      serviceId: payload.serviceId,
+      status: BookingStatus.REQUESTED
+    }
+  });
+  if (existingBooking) {
+    throw new Error("You already requested this service");
+  }
   const result = await prisma.booking.create({
     data: {
       customerId,
       technicianId: service.technicianId,
       serviceId: payload.serviceId,
-      bookingDate: new Date(payload.bookingDate),
+      bookingDate,
       address: payload.address,
       note: payload.note,
       totalPrice: service.price,
       status: BookingStatus.REQUESTED
     },
-    include: {
-      customer: true,
-      technician: true,
-      service: true
-    }
+    include: bookingInclude
   });
   return result;
 };
 var getMyBookings = async (userId, role) => {
   if (role === Role.CUSTOMER) {
-    return await prisma.booking.findMany({
+    return prisma.booking.findMany({
       where: {
         customerId: userId
       },
-      include: {
-        customer: true,
-        technician: true,
-        service: true
+      include: bookingInclude,
+      orderBy: {
+        createdAt: "desc"
       }
     });
   }
   if (role === Role.TECHNICIAN) {
-    return await prisma.booking.findMany({
+    return prisma.booking.findMany({
       where: {
         technicianId: userId
       },
-      include: {
-        customer: true,
-        technician: true,
-        service: true
+      include: bookingInclude,
+      orderBy: {
+        createdAt: "desc"
       }
     });
   }
-  return await prisma.booking.findMany({
-    include: {
-      customer: true,
-      technician: true,
-      service: true
+  return prisma.booking.findMany({
+    include: bookingInclude,
+    orderBy: {
+      createdAt: "desc"
     }
   });
 };
 var getSingleBooking = async (bookingId) => {
-  const result = await prisma.booking.findUniqueOrThrow({
+  return prisma.booking.findUniqueOrThrow({
     where: {
       id: bookingId
     },
     include: {
-      customer: true,
-      technician: true,
-      service: true,
-      payment: true
+      ...bookingInclude,
+      payment: true,
+      review: true
     }
   });
-  return result;
 };
 var updateBooking = async (bookingId, payload) => {
-  const result = await prisma.booking.update({
+  const booking = await prisma.booking.findUniqueOrThrow({
+    where: {
+      id: bookingId
+    }
+  });
+  if (booking.status === BookingStatus.COMPLETED) {
+    throw new Error(
+      "Completed booking cannot be updated"
+    );
+  }
+  return prisma.booking.update({
     where: {
       id: bookingId
     },
@@ -1180,9 +1271,18 @@ var updateBooking = async (bookingId, payload) => {
       status: payload.status
     }
   });
-  return result;
 };
 var deleteBooking = async (bookingId) => {
+  const booking = await prisma.booking.findUniqueOrThrow({
+    where: {
+      id: bookingId
+    }
+  });
+  if (booking.status === BookingStatus.COMPLETED) {
+    throw new Error(
+      "Completed booking cannot be deleted"
+    );
+  }
   await prisma.booking.delete({
     where: {
       id: bookingId
@@ -1332,6 +1432,7 @@ var createPayment = async (userId, payload) => {
   if (booking.status !== BookingStatus.ACCEPTED) {
     throw new Error("Booking is not accepted yet");
   }
+  console.log("APP URL:", config_default.appUrl);
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ["card"],
     line_items: [
@@ -1443,7 +1544,8 @@ var paymentService = {
 };
 
 // src/modules/payment/payment.controller.ts
-var createPayment2 = catchAsync(async (req, res, next) => {
+var createPayment2 = catchAsync(async (req, res) => {
+  console.log("BODY:", req.body);
   const userId = req.user?.id;
   const result = await paymentService.createPayment(
     userId,
@@ -1492,7 +1594,6 @@ var paymentController = {
 };
 
 // src/modules/payment/payment.route.ts
-import express from "express";
 var router5 = Router6();
 router5.post(
   "/create",
@@ -1501,7 +1602,6 @@ router5.post(
 );
 router5.post(
   "/confirm",
-  express.raw({ type: "application/json" }),
   paymentController.confirmPayment
 );
 router5.get(
@@ -1560,6 +1660,26 @@ var createReview = async (customerId, payload) => {
       booking: true
     }
   });
+  const stats = await prisma.review.aggregate({
+    where: {
+      technicianId: booking.technicianId
+    },
+    _avg: {
+      rating: true
+    },
+    _count: {
+      rating: true
+    }
+  });
+  await prisma.technicianProfile.update({
+    where: {
+      userId: booking.technicianId
+    },
+    data: {
+      rating: Number((stats._avg.rating ?? 0).toFixed(1)),
+      totalReviews: stats._count.rating
+    }
+  });
   return result;
 };
 var getAllReviews = async () => {
@@ -1611,7 +1731,7 @@ var updateReview = async (reviewId, customerId, payload) => {
   if (review.customerId !== customerId) {
     throw new Error("Unauthorized");
   }
-  return prisma.review.update({
+  const result = await prisma.review.update({
     where: {
       id: reviewId
     },
@@ -1620,6 +1740,22 @@ var updateReview = async (reviewId, customerId, payload) => {
       comment: payload.comment
     }
   });
+  const reviews = await prisma.review.findMany({
+    where: {
+      technicianId: review.technicianId
+    }
+  });
+  const averageRating = reviews.length === 0 ? 0 : reviews.reduce((sum, item) => sum + item.rating, 0) / reviews.length;
+  await prisma.technicianProfile.update({
+    where: {
+      userId: review.technicianId
+    },
+    data: {
+      rating: Number(averageRating.toFixed(1)),
+      totalReviews: reviews.length
+    }
+  });
+  return result;
 };
 var deleteReview = async (reviewId, customerId) => {
   const review = await prisma.review.findUniqueOrThrow({
@@ -1635,12 +1771,62 @@ var deleteReview = async (reviewId, customerId) => {
       id: reviewId
     }
   });
+  const reviews = await prisma.review.findMany({
+    where: {
+      technicianId: review.technicianId
+    }
+  });
+  const averageRating = reviews.length === 0 ? 0 : reviews.reduce((sum, item) => sum + item.rating, 0) / reviews.length;
+  await prisma.technicianProfile.update({
+    where: {
+      userId: review.technicianId
+    },
+    data: {
+      rating: Number(averageRating.toFixed(1)),
+      totalReviews: reviews.length
+    }
+  });
+  return {
+    message: "Review deleted successfully"
+  };
+};
+var getMyReviews = async (technicianId) => {
+  return prisma.review.findMany({
+    where: {
+      technicianId
+    },
+    include: {
+      customer: {
+        omit: {
+          password: true
+        }
+      },
+      booking: {
+        include: {
+          service: true
+        }
+      }
+    },
+    orderBy: {
+      createdAt: "desc"
+    }
+  });
+};
+var getMyReviewByBooking = async (bookingId, customerId) => {
+  return prisma.review.findFirst({
+    where: {
+      bookingId,
+      customerId
+    }
+  });
 };
 var reviewService = {
   createReview,
   getAllReviews,
   getSingleReview,
   updateReview,
+  getMyReviews,
+  getMyReviewByBooking,
   deleteReview
 };
 
@@ -1703,16 +1889,53 @@ var deleteReview2 = catchAsync(async (req, res) => {
     data: null
   });
 });
+var getMyReviews2 = catchAsync(
+  async (req, res) => {
+    const technicianId = req.user?.id;
+    const result = await reviewService.getMyReviews(
+      technicianId
+    );
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus8.OK,
+      message: "My reviews retrieved successfully",
+      data: result
+    });
+  }
+);
+var getMyReviewByBooking2 = catchAsync(
+  async (req, res) => {
+    const customerId = req.user?.id;
+    const { bookingId } = req.params;
+    const result = await reviewService.getMyReviewByBooking(
+      bookingId,
+      customerId
+    );
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus8.OK,
+      message: "Review retrieved successfully",
+      data: result
+    });
+  }
+);
 var reviewController = {
   createReview: createReview2,
   getAllReviews: getAllReviews2,
   getSingleReview: getSingleReview2,
+  getMyReviews: getMyReviews2,
+  getMyReviewByBooking: getMyReviewByBooking2,
   updateReview: updateReview2,
   deleteReview: deleteReview2
 };
 
 // src/modules/review/review.route.ts
 var router6 = Router7();
+router6.get(
+  "/my-reviews",
+  auth(Role.TECHNICIAN),
+  reviewController.getMyReviews
+);
 router6.post(
   "/",
   auth(Role.CUSTOMER),
@@ -1721,6 +1944,11 @@ router6.post(
 router6.get(
   "/",
   reviewController.getAllReviews
+);
+router6.get(
+  "/booking/:bookingId",
+  auth(Role.CUSTOMER),
+  reviewController.getMyReviewByBooking
 );
 router6.get(
   "/:id",
@@ -1733,7 +1961,7 @@ router6.patch(
 );
 router6.delete(
   "/:id",
-  auth(Role.CUSTOMER, Role.ADMIN),
+  auth(Role.CUSTOMER),
   reviewController.deleteReview
 );
 var reviewRoute = router6;
@@ -2028,15 +2256,20 @@ router7.get(
 var technicianRoute = router7;
 
 // src/app.ts
-var app = express2();
+var app = express();
 app.use(
   cors({
     origin: config_default.appUrl,
     credentials: true
   })
 );
-app.use(express2.json());
-app.use(express2.urlencoded({ extended: true }));
+var endpointSecret = config_default.stripe_webhook_secret;
+app.use(
+  "/api/payment/confirm",
+  express.raw({ type: "application/json" })
+);
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use("/api/users", userRoute);
 app.use("/api/auth", authRoute);

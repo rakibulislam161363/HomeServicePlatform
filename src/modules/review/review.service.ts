@@ -6,7 +6,6 @@ const createReview = async (
   customerId: string,
   payload: IReviewPayload
 ) => {
-
   const booking = await prisma.booking.findUnique({
     where: {
       id: payload.bookingId,
@@ -47,6 +46,28 @@ const createReview = async (
       customer: true,
       technician: true,
       booking: true,
+    },
+  });
+
+  const stats = await prisma.review.aggregate({
+    where: {
+      technicianId: booking.technicianId,
+    },
+    _avg: {
+      rating: true,
+    },
+    _count: {
+      rating: true,
+    },
+  });
+
+  await prisma.technicianProfile.update({
+    where: {
+      userId: booking.technicianId,
+    },
+    data: {
+      rating: Number((stats._avg.rating ?? 0).toFixed(1)),
+      totalReviews: stats._count.rating,
     },
   });
 
@@ -100,7 +121,6 @@ const updateReview = async (
   customerId: string,
   payload: Partial<IReviewPayload>
 ) => {
-
   const review = await prisma.review.findUniqueOrThrow({
     where: {
       id: reviewId,
@@ -111,7 +131,7 @@ const updateReview = async (
     throw new Error("Unauthorized");
   }
 
-  return prisma.review.update({
+  const result = await prisma.review.update({
     where: {
       id: reviewId,
     },
@@ -120,13 +140,36 @@ const updateReview = async (
       comment: payload.comment,
     },
   });
+
+  const reviews = await prisma.review.findMany({
+    where: {
+      technicianId: review.technicianId,
+    },
+  });
+
+  const averageRating =
+    reviews.length === 0
+      ? 0
+      : reviews.reduce((sum, item) => sum + item.rating, 0) /
+        reviews.length;
+
+  await prisma.technicianProfile.update({
+    where: {
+      userId: review.technicianId,
+    },
+    data: {
+      rating: Number(averageRating.toFixed(1)),
+      totalReviews: reviews.length,
+    },
+  });
+
+  return result;
 };
 
 const deleteReview = async (
   reviewId: string,
   customerId: string
 ) => {
-
   const review = await prisma.review.findUniqueOrThrow({
     where: {
       id: reviewId,
@@ -142,6 +185,65 @@ const deleteReview = async (
       id: reviewId,
     },
   });
+
+  const reviews = await prisma.review.findMany({
+    where: {
+      technicianId: review.technicianId,
+    },
+  });
+
+  const averageRating =
+    reviews.length === 0
+      ? 0
+      : reviews.reduce((sum, item) => sum + item.rating, 0) /
+        reviews.length;
+
+  await prisma.technicianProfile.update({
+    where: {
+      userId: review.technicianId,
+    },
+    data: {
+      rating: Number(averageRating.toFixed(1)),
+      totalReviews: reviews.length,
+    },
+  });
+
+  return {
+    message: "Review deleted successfully",
+  };
+};
+const getMyReviews = async (technicianId: string) => {
+  return prisma.review.findMany({
+    where: {
+      technicianId,
+    },
+    include: {
+      customer: {
+        omit: {
+          password: true,
+        },
+      },
+      booking: {
+        include: {
+          service: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+};
+const getMyReviewByBooking = async (
+  bookingId: string,
+  customerId: string
+) => {
+  return prisma.review.findFirst({
+    where: {
+      bookingId,
+      customerId,
+    },
+  });
 };
 
 export const reviewService = {
@@ -149,5 +251,7 @@ export const reviewService = {
   getAllReviews,
   getSingleReview,
   updateReview,
+  getMyReviews,
+  getMyReviewByBooking,
   deleteReview,
 };

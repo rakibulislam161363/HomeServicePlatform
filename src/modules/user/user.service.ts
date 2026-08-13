@@ -3,10 +3,18 @@ import { prisma } from "../../lib/prisma"
 import { IUserPayload } from "./user.interface"
 
 
-const getAllUsers = async ()=>{
-   const users = await prisma.user.findMany({
+const getAllUsers = async (
+  query: Record<string, string | undefined>
+) => {
+  const users = await prisma.user.findMany({
+    where: {
+      ...(query.role && { role: query.role as any }),
+    },
     omit: {
       password: true,
+    },
+    include: {
+      technicianProfile: true,
     },
     orderBy: {
       createdAt: "desc",
@@ -17,16 +25,17 @@ const getAllUsers = async ()=>{
 };
 
 const getSingleUser = async (userId: string) => {
-    const result = await prisma.user. findUniqueOrThrow({
-        where: {
-            id: userId
-        },
-        omit: {
-            password: true
-        }
-    })
-
-    return result;
+  return prisma.user.findUniqueOrThrow({
+    where: {
+      id: userId,
+    },
+    omit: {
+      password: true,
+    },
+    include: {
+      technicianProfile: true,
+    },
+  });
 };
 
 
@@ -67,18 +76,64 @@ const updateUserStatus = async (
       password: true,
     },
   });
-
+  
   return result;
 };
 
-const deleteUser = async(id : string)=> {
- const result = await prisma.user.delete({
+const deleteUser = async (id: string) => {
+  return prisma.user.delete({
     where: {
-        id,
+      id,
+    },
+  });
+};
+
+const getUserStats = async()=>{
+
+
+  const totalUsers = await prisma.user.count();
+
+
+
+  const customers = await prisma.user.count({
+
+    where:{
+      role:"CUSTOMER"
     }
- })
- return result
-}
+
+  });
+
+
+
+  const technicians = await prisma.user.count({
+
+    where:{
+      role:"TECHNICIAN"
+    }
+
+  });
+
+
+
+  const activeUsers = await prisma.user.count({
+
+    where:{
+      status:"ACTIVE"
+    }
+
+  });
+
+
+
+  return {
+    totalUsers,
+    customers,
+    technicians,
+    activeUsers
+  };
+
+
+};
 
 
 export const userService = {
@@ -86,5 +141,6 @@ export const userService = {
     getSingleUser,
     getUserUpdate,
     updateUserStatus,
-    deleteUser
+    deleteUser,
+    getUserStats
 }

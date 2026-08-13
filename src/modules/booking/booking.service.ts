@@ -2,17 +2,22 @@ import { BookingStatus, Role } from "../../../generated/prisma/enums";
 import { prisma } from "../../lib/prisma";
 import { IBookingPayload } from "./booking.interface";
 
-const bookingInclude = {
+export const bookingInclude = {
   customer: {
     omit: {
       password: true,
     },
   },
+
   technician: {
     omit: {
       password: true,
     },
+    include: {
+      technicianProfile: true,
+    },
   },
+
   service: {
     include: {
       category: true,

@@ -6,7 +6,7 @@ import httpStatus from "http-status";
 
 const getAllUsers = catchAsync(async (req:Request, res: Response, next: NextFunction) =>{
 
-  const result = await userService.getAllUsers();
+  const result = await userService.getAllUsers(req.query as any);
 
   sendResponse(res,{
     success:true,
@@ -17,49 +17,60 @@ const getAllUsers = catchAsync(async (req:Request, res: Response, next: NextFunc
   })
 });
 
-const getSingleUser = catchAsync(async(req: Request, res: Response, next: NextFunction) => {
-  const userId = req.user?.id;
+const getSingleUser = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
 
-  const result = await userService.getSingleUser(userId);
+    const result = await userService.getSingleUser(id as string);
 
-  sendResponse(res, {
-    success: true,
-    statusCode: httpStatus.OK,
-    message: "Single users",
-    data: result
-  })
-});
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "User retrieved successfully",
+      data: result,
+    });
+  }
+);
 
 
-const updateUser = catchAsync(async(req: Request, res: Response, next: NextFunction) => {
-  const payload = req.body;
-  const userId = req.user?.id;
+const updateUser = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const payload = req.body;
 
-  const result = await userService.getUserUpdate(payload, userId);
+    const result = await userService.getUserUpdate(
+      payload,
+      id as string
+    );
 
-  sendResponse(res, {
-    success: true,
-    statusCode: httpStatus.OK,
-    message: "User data update successfully",
-    data: result
-  })
-});
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "User updated successfully",
+      data: result,
+    });
+  }
+);
 
-const updateUserStatus = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-  const updateUserStatus = catchAsync(async (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
+const updateUserStatus = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { status } = req.body;
 
-  const result = await userService.updateUserStatus(id as string, status);
+    const result = await userService.updateUserStatus(
+      id as string,
+      status
+    );
+    
 
-  sendResponse(res, {
-    success: true,
-    statusCode: httpStatus.OK,
-    message: "User status updated successfully",
-    data: result,
-  });
-});
-})
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "User status updated successfully",
+      data: result,
+    });
+  }
+);
 
 const deleteUser = catchAsync(async(req: Request, res: Response, next: NextFunction) => {
 const {id} = req.params;
@@ -72,6 +83,21 @@ sendResponse(res, {
   data: null
 })
 })
+const getUserStats = catchAsync(async(req,res)=>{
+
+
+ const result = await userService.getUserStats();
+
+
+ sendResponse(res,{
+   statusCode:200,
+   success:true,
+   message:"Stats fetched successfully",
+   data:result
+ });
+
+
+});
 
 
 
@@ -80,5 +106,6 @@ export const userController = {
     getSingleUser,
     updateUser,
     updateUserStatus,
+    getUserStats,
     deleteUser
 }

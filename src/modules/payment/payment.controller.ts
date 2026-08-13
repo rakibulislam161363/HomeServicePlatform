@@ -4,7 +4,9 @@ import { sendResponse } from "../../utils/sendResponse";
 import httpStatus from "http-status"
 import { paymentService } from "./payment.service";
 
-const createPayment = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+const createPayment = catchAsync(async (req, res) => {
+  console.log("BODY:", req.body);
+
   const userId = req.user?.id;
 
   const result = await paymentService.createPayment(

@@ -29,6 +29,7 @@ const createPayment = async (
   if (booking.status !== BookingStatus.ACCEPTED) {
     throw new Error("Booking is not accepted yet");
   }
+  console.log("APP URL:", config.appUrl);
 
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ["card"],
